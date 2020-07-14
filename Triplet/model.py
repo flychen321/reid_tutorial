@@ -195,8 +195,8 @@ class ft_net(nn.Module):
         # avg pooling to global pooling
         model_ft.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.model = model_ft
-        # self.fc = FcBlock(input_dim=2048, relu=False, num_bottleneck=512)
-        self.fc = Fc_ClassBlock(2048, class_num, dropout=0.5, relu=False)
+        self.fc = FcBlock(input_dim=2048, relu=False, num_bottleneck=512)
+        # self.fc = Fc_ClassBlock(2048, class_num, dropout=0.5, relu=False)
         # remove the final downsample
         # self.model.layer4[0].downsample[0].stride = (1,1)
         # self.model.layer4[0].conv2.stride = (1,1)
@@ -212,7 +212,9 @@ class ft_net(nn.Module):
         x = self.model.layer4(x)
         x = self.model.avgpool(x)
         x = x.view(x.size(0), x.size(1))
-        x, f = self.fc(x)
+        f = self.fc(x)
+        f_norm = f.norm(p=2, dim=1, keepdim=True) + 1e-8
+        f = f.div(f_norm)
         return f
 
 

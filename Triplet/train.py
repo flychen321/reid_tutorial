@@ -199,7 +199,7 @@ def train(model, criterion_triplet, optimizer, scheduler, num_epochs=25):
             print('{} triplet_epoch_loss: {:.4f} triplet_epoch_acc: {:.4f} MeanMargin: {:.4f}'.format(
                 phase, triplet_epoch_loss, triplet_epoch_acc, epoch_margin))
 
-            if epoch_acc > best_acc or (np.fabs(epoch_acc - best_acc) < 1e-5 and epoch_loss < best_loss):
+            if epoch_acc > best_acc or (np.fabs(epoch_acc - best_acc) < 1e-5 and triplet_epoch_loss < best_loss):
                 best_acc = epoch_acc
                 best_loss = triplet_epoch_loss
                 best_epoch = epoch
