@@ -20,5 +20,6 @@
 *augment.py
 *run.py
 *data/*
+*.db
 *experiment*
 *result*
