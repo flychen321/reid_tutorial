@@ -24,7 +24,7 @@ version = torch.__version__
 # Options
 # --------
 parser = argparse.ArgumentParser(description='Training')
-parser.add_argument('--name', default='ide', type=str, help='output model name')
+parser.add_argument('--name', default='triplet', type=str, help='output model name')
 parser.add_argument('--save_model_name', default='', type=str, help='save_model_name')
 parser.add_argument('--data_dir', default='market', type=str, help='training dir path')
 parser.add_argument('--batchsize', default=16, type=int, help='batchsize')

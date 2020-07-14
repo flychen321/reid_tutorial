@@ -19,5 +19,6 @@
 *.idea*
 *augment.py
 *run.py
+*data/*
 *experiment*
 *result*
