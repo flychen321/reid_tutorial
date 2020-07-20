@@ -13,15 +13,12 @@ import shutil
 
 # image size: 128 * 64 *3
 parser = argparse.ArgumentParser(description='Evaluate')
-parser.add_argument('--data_dir', default='market', type=str, help='data_dir')
 parser.add_argument('--mode', default=1, type=int, help='mode')
 opt = parser.parse_args()
 print('opt = %s' % opt)
-data_dir = opt.data_dir
-print('data_dir = %s' % data_dir)
 print('opt.mode = %s' % opt.mode)
 
-cam_metric = torch.zeros(6, 6)
+cam_metric = torch.zeros(15, 15)
 
 
 def evaluate(qf, ql, qc, gf, gl, gc, gn=None):

@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use('agg')
 import time
 import os
-from model import ft_net, save_network
+from model import ft_net, save_network, save_whole_network
 from random_erasing import RandomErasing
 import yaml
 from torch.utils.data import Dataset, DataLoader
@@ -70,10 +70,11 @@ data_transforms = {
 
 
 image_datasets = {}
-train_path = os.path.join(data_dir, 'train_all_2')
-image_datasets['train'] = datasets.ImageFolder(train_path, data_transforms['train'])
+train_path = os.path.join(data_dir, 'train_all')
+image_datasets['train'] = datasets.ImageFolder(train_path,
+                                  data_transforms['train'])
 
-class_num = len(os.listdir(train_path))
+class_num = len(os.listdir(os.path.join(data_dir, 'train_all')))
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
                                               shuffle=True, num_workers=8)
                for x in ['train']}
@@ -152,17 +153,17 @@ def train(model, criterion, optimizer, scheduler, num_epochs=25):
                 best_acc = epoch_acc
                 best_loss = epoch_loss
                 best_epoch = epoch
-                save_network(model, name, 'best' + '_' + str(opt.net_loss_model))
+                save_whole_network(model, name, 'best' + '_' + str(opt.net_loss_model))
 
             if epoch % 10 == 9:
-                save_network(model, name, epoch)
+                save_whole_network(model, name, epoch)
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
 
     print('best_epoch = %s     best_loss = %s     best_acc = %s' % (best_epoch, best_loss, best_acc))
-    save_network(model, name, 'last' + '_' + str(opt.net_loss_model))
+    save_whole_network(model, name, 'last' + '_' + str(opt.net_loss_model))
     return model
 
 def train_with_softlabel(model, criterion_soft, optimizer, scheduler, num_epochs=25):
@@ -223,17 +224,17 @@ def train_with_softlabel(model, criterion_soft, optimizer, scheduler, num_epochs
                 best_acc = epoch_acc
                 best_loss = epoch_loss
                 best_epoch = epoch
-                save_network(model, name, 'best' + '_' + str(opt.net_loss_model))
+                save_whole_network(model, name, 'best' + '_' + str(opt.net_loss_model))
 
             if epoch % 10 == 9:
-                save_network(model, name, epoch)
+                save_whole_network(model, name, epoch)
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
 
     print('best_epoch = %s     best_loss = %s     best_acc = %s' % (best_epoch, best_loss, best_acc))
-    save_network(model, name, 'last' + '_' + str(opt.net_loss_model))
+    save_whole_network(model, name, 'last' + '_' + str(opt.net_loss_model))
     return model
 
 
