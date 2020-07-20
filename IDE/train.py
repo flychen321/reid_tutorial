@@ -70,11 +70,10 @@ data_transforms = {
 
 
 image_datasets = {}
+train_path = os.path.join(data_dir, 'train_all_2')
+image_datasets['train'] = datasets.ImageFolder(train_path, data_transforms['train'])
 
-image_datasets['train'] = datasets.ImageFolder(os.path.join(data_dir, 'train_all'),
-                                  data_transforms['train'])
-
-class_num = len(os.listdir(os.path.join(data_dir, 'train_all')))
+class_num = len(os.listdir(train_path))
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
                                               shuffle=True, num_workers=8)
                for x in ['train']}
