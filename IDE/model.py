@@ -196,8 +196,8 @@ class ft_net(nn.Module):
         self.model = model_ft
         self.classifier = Fc_ClassBlock(2048, class_num, dropout=0.5, relu=False)
         # remove the final downsample
-        # self.model.layer4[0].downsample[0].stride = (1,1)
-        # self.model.layer4[0].conv2.stride = (1,1)
+        self.model.layer4[0].downsample[0].stride = (1,1)
+        self.model.layer4[0].conv2.stride = (1,1)
 
     def forward(self, x):
         x = self.model.conv1(x)
