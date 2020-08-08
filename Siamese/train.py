@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use('agg')
 import time
 import os
-from model import ft_net, save_network, SiameseNet
+from model import ft_net, save_network, save_whole_network, SiameseNet
 from random_erasing import RandomErasing
 import yaml
 from torch.utils.data import Dataset, DataLoader
@@ -130,11 +130,13 @@ def train(model, criterion_contrastive, criterion_verify, optimizer, scheduler, 
                 # forward
                 feature1, feature2, output = model(inputs1, inputs2)
                 _, verify_preds = torch.max(output.detach(), 1)
-                loss_verify = criterion_verify(output, siamese_labels)
 
+                # #representation leaarning
+                loss_verify = criterion_verify(output, siamese_labels)
+                # #metric learning
                 loss_contrastive = criterion_contrastive(feature1, feature2, siamese_labels)
 
-                loss = loss_verify + loss_contrastive
+                loss = loss_verify + 0 * loss_contrastive
 
                 # backward + optimize only if in training phase
                 if phase == 'train':
@@ -154,17 +156,17 @@ def train(model, criterion_contrastive, criterion_verify, optimizer, scheduler, 
                 best_acc = epoch_acc
                 best_loss = epoch_loss
                 best_epoch = epoch
-                save_network(model, name, 'best' + '_' + str(opt.net_loss_model))
+                save_whole_network(model, name, 'best' + '_' + str(opt.net_loss_model))
 
             if epoch % 10 == 9:
-                save_network(model, name, epoch)
+                save_whole_network(model, name, epoch)
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
 
     print('best_epoch = %s     best_loss = %s     best_acc = %s' % (best_epoch, best_loss, best_acc))
-    save_network(model, name, 'last' + '_' + str(opt.net_loss_model))
+    save_whole_network(model, name, 'last' + '_' + str(opt.net_loss_model))
     return model
 
 

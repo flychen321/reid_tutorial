@@ -17,7 +17,7 @@ from model import ft_net, load_network, load_whole_network, SiameseNet
 # --------
 parser = argparse.ArgumentParser(description='Testing')
 parser.add_argument('--gpu_ids', default='0', type=str, help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--which_epoch', default='best', type=str, help='0,1,2,3...or last')
+parser.add_argument('--which_epoch', default='last', type=str, help='0,1,2,3...or last')
 parser.add_argument('--test_dir', default='market', type=str, help='./test_data')
 parser.add_argument('--name', default='siamese', type=str, help='save model path')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
@@ -135,7 +135,7 @@ model = SiameseNet(embedding_net)
 if use_gpu:
     model.cuda()
 
-model = load_network(model, name, opt.which_epoch + '_' + str(opt.net_loss_model))
+model = load_whole_network(model, name, opt.which_epoch + '_' + str(opt.net_loss_model))
 model = model.eval()
 if use_gpu:
     model = model.cuda()

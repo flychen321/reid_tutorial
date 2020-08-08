@@ -10,17 +10,16 @@ import time
 import os
 import scipy.io
 import yaml
-from model import ft_net
-from model import load_network, load_whole_network
+from model import ft_net, load_network, load_whole_network, SiameseNet
+
 ######################################################################
 # Options
 # --------
-
 parser = argparse.ArgumentParser(description='Testing')
 parser.add_argument('--gpu_ids', default='0', type=str, help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--which_epoch', default='last', type=str, help='0,1,2,3...or last')
-parser.add_argument('--test_dir', default='market', type=str, help='./test_data')
-parser.add_argument('--name', default='triplet', type=str, help='save model path')
+parser.add_argument('--test_dir', default='duke', type=str, help='./test_data')
+parser.add_argument('--name', default='siamese', type=str, help='save model path')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
 parser.add_argument('--net_loss_model', default=0, type=int, help='net_loss_model')
 
@@ -88,7 +87,7 @@ def extract_feature(model, dataloaders):
                 img = fliplr(img)
             input_img = img.cuda()
             outputs = model(input_img)
-            ff = ff + outputs
+            ff = ff + outputs[1]
         # norm feature
         fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
         ff = ff.div(fnorm.expand_as(ff))
@@ -131,7 +130,11 @@ for i in range(len(dataset_list)):
 # Load Collected data Trained model
 print('-------test-----------')
 class_num = len(os.listdir(os.path.join(data_dir, 'train_all')))
-model = ft_net(class_num)
+embedding_net = ft_net(class_num)
+model = SiameseNet(embedding_net)
+if use_gpu:
+    model.cuda()
+
 model = load_whole_network(model, name, opt.which_epoch + '_' + str(opt.net_loss_model))
 model = model.eval()
 if use_gpu:

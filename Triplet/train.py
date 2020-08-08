@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use('agg')
 import time
 import os
-from model import ft_net, save_network
+from model import ft_net, save_network, save_whole_network
 from random_erasing import RandomErasing
 import yaml
 from torch.utils.data import Dataset, DataLoader
@@ -203,17 +203,17 @@ def train(model, criterion_triplet, optimizer, scheduler, num_epochs=25):
                 best_acc = epoch_acc
                 best_loss = triplet_epoch_loss
                 best_epoch = epoch
-                save_network(model, name, 'best' + '_' + str(opt.net_loss_model))
+                save_whole_network(model, name, 'best' + '_' + str(opt.net_loss_model))
 
             if epoch % 10 == 9:
-                save_network(model, name, epoch)
+                save_whole_network(model, name, epoch)
 
         time_elapsed = time.time() - since
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
 
     print('best_epoch = %s     best_loss = %s     best_acc = %s' % (best_epoch, best_loss, best_acc))
-    save_network(model, name, 'last' + '_' + str(opt.net_loss_model))
+    save_whole_network(model, name, 'last' + '_' + str(opt.net_loss_model))
     return model
 
 

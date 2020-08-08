@@ -13,21 +13,23 @@ import matplotlib
 matplotlib.use('agg')
 import time
 import os
-from model import ft_net, save_network, save_whole_network
+from model import ft_net, save_network, save_whole_network, SiameseNet
 from random_erasing import RandomErasing
 import yaml
 from torch.utils.data import Dataset, DataLoader
-from datasets import TripletFolderPN, TripletFolder
+from losses import ContrastiveLoss
+from datasets import SiameseDataset
+
 version = torch.__version__
 
 ######################################################################
 # Options
 # --------
 parser = argparse.ArgumentParser(description='Training')
-parser.add_argument('--name', default='ide_triplet', type=str, help='output model name')
+parser.add_argument('--name', default='siamese', type=str, help='output model name')
 parser.add_argument('--save_model_name', default='', type=str, help='save_model_name')
-parser.add_argument('--data_dir', default='market', type=str, help='training dir path')
-parser.add_argument('--batchsize', default=16, type=int, help='batchsize')
+parser.add_argument('--data_dir', default='duke', type=str, help='training dir path')
+parser.add_argument('--batchsize', default=48, type=int, help='batchsize')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
 parser.add_argument('--alpha', default=1.0, type=float, help='alpha')
 parser.add_argument('--erasing_p', default=0.5, type=float, help='Random Erasing probability, in [0,1]')
@@ -68,11 +70,10 @@ data_transforms = {
     'train': transforms.Compose(transform_train_list)
 }
 
-
 image_datasets = {}
 
-image_datasets['train'] = TripletFolder(os.path.join(data_dir, 'train_all'),
-                                  data_transforms['train'])
+image_datasets['train'] = SiameseDataset(os.path.join(data_dir, 'train_all'),
+                                         data_transforms['train'])
 
 class_num = len(os.listdir(os.path.join(data_dir, 'train_all')))
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=opt.batchsize,
@@ -86,19 +87,12 @@ use_gpu = torch.cuda.is_available()
 since = time.time()
 print(time.time() - since)
 
-def get_soft_label_lsr(labels, w_main=0.8, bit_num=751):
-    w_reg = (1.0 - w_main) / bit_num
-    soft_label = np.zeros((len(labels), int(bit_num)))
-    soft_label.fill(w_reg)
-    for i in np.arange(len(labels)):
-        soft_label[i][labels[i]] = w_main + w_reg
-    return torch.Tensor(soft_label)
 
 ######################################################################
 # Training the model
 # ------------------
 
-def train(model, criterion_id, criterion_triplet, optimizer, scheduler, num_epochs=25):
+def train(model, criterion_contrastive, criterion_verify, optimizer, scheduler, num_epochs=25):
     since = time.time()
     best_acc = 0.0
     best_loss = 10000.0
@@ -116,78 +110,42 @@ def train(model, criterion_id, criterion_triplet, optimizer, scheduler, num_epoc
                 model.train(False)  # Set model to evaluate mode
 
             running_loss = 0.0
+            running_loss_id = 0.0
+            running_loss_vf = 0.0
             running_corrects = 0.0
-            id_running_loss = 0.0
-            id_running_corrects = 0.0
-            triplet_running_loss = 0.0
-            triplet_running_corrects = 0.0
-            running_margin = 0.0
+            running_corrects_id = 0.0
+            running_corrects_vf = 0.0
             # Iterate over data.
             for data in dataloaders[phase]:
                 # get the inputs
-                anchors, labels, pos = data
-                now_batch_size, c, h, w = anchors.shape
+                (inputs1, inputs2), siamese_labels, (labels1, labels2) = data
+                now_batch_size, c, h, w = inputs1.shape
                 if now_batch_size < opt.batchsize:  # next epoch
                     continue
 
-                pos = pos.view(-1, c, h, w)
-                # copy pos labels 4times
-                pos_labels = labels.repeat(4).reshape(4, now_batch_size)
-                pos_labels = pos_labels.transpose(0, 1).reshape(4 * now_batch_size)
                 if use_gpu:
-                    anchors = anchors.cuda()
-                    pos = pos.cuda()
-                    labels = labels.cuda()
+                    inputs1 = inputs1.cuda()
+                    inputs2 = inputs2.cuda()
+                    siamese_labels = siamese_labels.cuda()
+                    labels1 = labels1.cuda()
+                    labels2 = labels2.cuda()
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
                 # forward
-                anchor_outputs, anchor_features = model(anchors)
-                _, anchor_preds = torch.max(anchor_outputs.detach(), 1)
-                loss_id = criterion_id(anchor_outputs, labels)
+                output1, feature1, output2, feature2, output_vf = model(inputs1, inputs2)
+                # feature1, feature2, output = model(inputs1, inputs2)
+                _, id_preds1 = torch.max(output1.detach(), 1)
+                _, id_preds2 = torch.max(output2.detach(), 1)
+                _, verify_preds = torch.max(output_vf.detach(), 1)
 
-                pos_outputs, pos_features = model(pos)
-                f = anchor_features
-                pf = pos_features
-                neg_labels = pos_labels
-                # hard-neg
-                # ----------------------------------
-                nf_data = pf  # 128*512
-                rand = np.random.permutation(4 * now_batch_size)
-                nf_data = nf_data[rand, :]
-                neg_labels = neg_labels[rand]
-                nf_t = nf_data.transpose(0, 1)  # 512*64
-                score = torch.mm(f.data, nf_t)  # cosine 16*64
-                score, rank = score.sort(dim=1, descending=True)  # score high == hard
-                labels_cpu = labels.cpu()
-                nf_hard = torch.zeros(f.shape).cuda()
-                for k in range(now_batch_size):
-                    hard = rank[k, :]
-                    for kk in hard:
-                        now_label = neg_labels[kk]
-                        anchor_label = labels_cpu[k]
-                        if now_label != anchor_label:
-                            nf_hard[k, :] = nf_data[kk, :]
-                            break
+                loss_id1 = criterion_verify(output1, labels1)
+                loss_id2 = criterion_verify(output2, labels2)
+                loss_id = loss_id1 + loss_id2
 
-                # hard-pos
-                # ----------------------------------
-                pf_hard = torch.zeros(f.shape).cuda()  # 16*512
-                for k in range(now_batch_size):
-                    pf_data = pf[4 * k:4 * k + 4, :]
-                    pf_t = pf_data.transpose(0, 1)  # 512*4
-                    ff = f.data[k, :].reshape(1, -1)  # 1*512
-                    score = torch.mm(ff, pf_t)  # cosine
-                    score, rank = score.sort(dim=1, descending=False)  # score low == hard
-                    pf_hard[k, :] = pf_data[rank[0][0], :]
+                loss_vf = criterion_verify(output_vf, siamese_labels)
 
-                # loss
-                # ---------------------------------
-                pscore = torch.sum(f * pf_hard, dim=1)
-                nscore = torch.sum(f * nf_hard, dim=1)
-                loss_triplet = criterion_triplet(f, pf_hard, nf_hard)
-
-                loss = loss_id + 0.2 * loss_triplet
+                loss = loss_id + loss_vf
 
                 # backward + optimize only if in training phase
                 if phase == 'train':
@@ -195,27 +153,23 @@ def train(model, criterion_id, criterion_triplet, optimizer, scheduler, num_epoc
                     optimizer.step()
                 # statistics
                 running_loss += loss.item()  # * opt.batchsize
-                id_running_loss += loss_id.item()
-                id_running_corrects += float(torch.sum(anchor_preds == labels.detach()))
-                triplet_running_loss += loss_triplet.item()  # * opt.batchsize
-                triplet_running_corrects += float(torch.sum(pscore > nscore + 0.5))
-                running_margin += float(torch.sum(pscore - nscore))
+                running_loss_id += loss_id.item()  # * opt.batchsize
+                running_loss_vf += loss_vf.item()  # * opt.batchsize
+                running_corrects_id += float(torch.sum(id_preds1 == labels1.detach()))
+                running_corrects_id += float(torch.sum(id_preds2 == labels2.detach()))
+                running_corrects_vf += float(torch.sum(verify_preds == siamese_labels.detach()))
 
-            datasize = dataset_sizes[phase] // opt.batchsize * now_batch_size
+            datasize = dataset_sizes[phase] // opt.batchsize * opt.batchsize
             epoch_loss = running_loss / datasize
-            id_epoch_loss = id_running_loss / datasize
-            id_epoch_acc = id_running_corrects / datasize
-            triplet_epoch_loss = triplet_running_loss / datasize
-            triplet_epoch_acc = triplet_running_corrects / datasize
-            epoch_margin = running_margin / datasize
-            epoch_acc = (id_epoch_acc + triplet_epoch_acc) / 2.0
+            epoch_loss_id = running_loss_id / (2 * datasize)
+            epoch_loss_vf = running_loss_vf / datasize
+            epoch_acc_id = running_corrects_id / (2 * datasize)
+            epoch_acc_vf = running_corrects_vf / datasize
+            epoch_acc = (epoch_acc_id + epoch_acc_vf) / 2.0
 
-            print(
-                '{} Loss: {:.4f}  Acc: {:.4f} id_loss: {:.4f}  id_acc: {:.4f}'.format(
-                    phase, epoch_loss, epoch_acc, id_epoch_loss, id_epoch_acc))
-            print('{} triplet_epoch_loss: {:.4f} triplet_epoch_acc: {:.4f} MeanMargin: {:.4f}'.format(
-                phase, triplet_epoch_loss, triplet_epoch_acc, epoch_margin))
-
+            print('{} Loss: {:.4f}   Acc_id: {:.4f}   Acc_vf: {:.4f} '.format(phase, epoch_loss, epoch_acc_id,
+                                                                              epoch_acc_vf))
+            print('loss_id: {:.4f}   loss_vf: {:.4f} '.format(epoch_loss_id, epoch_loss_vf))
             if epoch_acc > best_acc or (np.fabs(epoch_acc - best_acc) < 1e-5 and epoch_loss < best_loss):
                 best_acc = epoch_acc
                 best_loss = epoch_loss
@@ -245,18 +199,19 @@ if not os.path.exists('model'):
     os.mkdir('model')
 
 print('class_num = %d' % (class_num))
-model = ft_net(class_num)
+embedding_net = ft_net(class_num)
+model = SiameseNet(embedding_net)
 if use_gpu:
     model.cuda()
 
 # print('model structure')
 # print(model)
 
-criterion_id = nn.CrossEntropyLoss()
-criterion_triplet = nn.TripletMarginLoss(margin=0.5)
+criterion_contrastive = ContrastiveLoss()
+criterion_verify = nn.CrossEntropyLoss()
 
-classifier_id = list(map(id, model.classifier.parameters())) \
-                + list(map(id, model.model.fc.parameters()))
+classifier_id = list(map(id, model.embedding_net.classifier.parameters())) \
+                + list(map(id, model.classifier.parameters()))
 classifier_params = filter(lambda p: id(p) in classifier_id, model.parameters())
 base_params = filter(lambda p: id(p) not in classifier_id, model.parameters())
 
@@ -265,12 +220,8 @@ optimizer_ft = optim.SGD([
     {'params': base_params, 'lr': 0.1 * opt.lr},
 ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
-
-epoch = 40
-step = 12
+epoch = 65
+step = 20
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=step, gamma=0.1)
 print('net_loss_model = %s   epoc = %3d   step = %3d' % (opt.net_loss_model, epoch, step))
-model = train(model, criterion_id, criterion_triplet, optimizer_ft, exp_lr_scheduler,
-              num_epochs=epoch)
-
-
+model = train(model, criterion_contrastive, criterion_verify, optimizer_ft, exp_lr_scheduler, num_epochs=epoch)
