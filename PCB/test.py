@@ -84,62 +84,6 @@ def fliplr(img):
     return img_flip
 
 
-def extract_feature0(model, dataloaders):
-    features = torch.FloatTensor()
-    count = 0
-    for data in dataloaders:
-        img, label = data
-        n, c, h, w = img.size()
-        ff = torch.FloatTensor(n, 512).zero_().cuda()
-        for i in range(2):
-            if (i == 1):
-                img = fliplr(img)
-            input_img = img.cuda()
-            outputs = model(input_img)
-            ff = ff + outputs[1]
-        # norm feature
-        fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
-        ff = ff.div(fnorm.expand_as(ff))
-        ff = ff.detach().cpu().float()
-        features = torch.cat((features, ff), 0)
-    return features
-
-def extract_feature2(model,dataloaders):
-    features = torch.FloatTensor()
-    count = 0
-    for data in dataloaders:
-        img, label = data
-        n, c, h, w = img.size()
-        count += n
-        print(count)
-        ff = torch.FloatTensor(n,512).zero_().cuda()
-        if opt.PCB:
-            ff = torch.FloatTensor(n,512,6).zero_().cuda() # we have six parts
-
-        for i in range(2):
-            if(i==1):
-                input_img = fliplr(img)
-            for scale in ms:
-                if scale != 1:
-                    # bicubic is only  available in pytorch>= 1.1
-                    input_img = nn.functional.interpolate(input_img, scale_factor=scale, mode='bicubic', align_corners=False)
-                outputs = model(input_img)
-                ff += outputs
-        # norm feature
-        if opt.PCB:
-            # feature size (n,2048,6)
-            # 1. To treat every part equally, I calculate the norm for every 2048-dim part feature.
-            # 2. To keep the cosine score==1, sqrt(6) is added to norm the whole feature (2048*6).
-            fnorm = torch.norm(ff, p=2, dim=1, keepdim=True) * np.sqrt(6)
-            ff = ff.div(fnorm.expand_as(ff))
-            ff = ff.view(ff.size(0), -1)
-        else:
-            fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
-            ff = ff.div(fnorm.expand_as(ff))
-
-        features = torch.cat((features,ff.data.cpu()), 0)
-    return features
-
 def extract_feature(model, dataloaders):
     features = torch.FloatTensor()
     count = 0
@@ -153,12 +97,12 @@ def extract_feature(model, dataloaders):
             if (i == 1):
                 img = fliplr(img)
             input_img = img.cuda()
-            outputs = model(input_img)
+            outputs = model(input_img)[1]
             ff = ff + outputs
         # norm feature
         if opt.PCB:
             # feature size (n,2048,6)
-            # 1. To treat every part equally, I calculate the norm for every 2048-dim part feature.
+            # 1. To treat every part equally, I calculate the norm for every 512-dim part feature.
             # 2. To keep the cosine score==1, sqrt(6) is added to norm the whole feature (512*6).
             fnorm = torch.norm(ff, p=2, dim=1, keepdim=True) * np.sqrt(6)
             ff = ff.div(fnorm.expand_as(ff))

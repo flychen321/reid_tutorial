@@ -247,24 +247,6 @@ class PCB(nn.Module):
         x = self.model.layer3(x)
         x = self.model.layer4(x)
         x = self.avgpool(x)
-        # if not self.istrain:
-        #     y = x.view(x.size(0), x.size(1), x.size(2))
-        #     return y
-
-        # x = self.dropout(x)
-        # part = {}
-        # predict = {}
-        # # get six part feature batchsize*2048*6
-        # for i in range(self.part):
-        #     part[i] = torch.squeeze(x[:, :, i])
-        #     name = 'classifier' + str(i)
-        #     c = getattr(self, name)
-        #     predict[i] = c(part[i])
-        # y = []
-        # for i in range(self.part):
-        #     y.append(predict[i])
-        # return y
-
         x = self.dropout(x)
         features = torch.FloatTensor().cuda()
         outputs = torch.FloatTensor().cuda()
@@ -280,31 +262,6 @@ class PCB(nn.Module):
             outputs = torch.cat((outputs, predict[i][0].unsqueeze(-1)), -1)
             features = torch.cat((features, predict[i][1].unsqueeze(-1)), -1)
         return outputs, features
-
-
-class PCB_test(nn.Module):
-    def __init__(self, model):
-        super(PCB_test, self).__init__()
-        self.part = 6
-        self.model = model.model
-        self.avgpool = nn.AdaptiveAvgPool2d((self.part, 1))
-        # remove the final downsample
-        self.model.layer4[0].downsample[0].stride = (1, 1)
-        self.model.layer4[0].conv2.stride = (1, 1)
-
-    def forward(self, x):
-        x = self.model.conv1(x)
-        x = self.model.bn1(x)
-        x = self.model.relu(x)
-        x = self.model.maxpool(x)
-
-        x = self.model.layer1(x)
-        x = self.model.layer2(x)
-        x = self.model.layer3(x)
-        x = self.model.layer4(x)
-        x = self.avgpool(x)
-        y = x.view(x.size(0), x.size(1), x.size(2))
-        return y
 
 
 

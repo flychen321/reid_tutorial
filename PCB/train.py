@@ -144,18 +144,6 @@ def train(model, criterion, optimizer, scheduler, num_epochs=25):
                     loss = criterion(part[:,:,0], id_labels)
                     for i in range(num_part - 1):
                         loss += criterion(part[:,:,i + 1], id_labels)
-
-                    # output = model(inputs)
-                    # part = {}
-                    # sm = nn.Softmax(dim=1)
-                    # num_part = 6
-                    # for i in range(num_part):
-                    #     part[i] = output[i][0]
-                    # score = sm(part[0]) + sm(part[1]) + sm(part[2]) + sm(part[3]) + sm(part[4]) + sm(part[5])
-                    # _, id_preds = torch.max(score.data, 1)
-                    # loss = criterion(part[0], id_labels)
-                    # for i in range(num_part - 1):
-                    #     loss += criterion(part[i + 1], id_labels)
                 else:
                     output = model(inputs)[0]
                     _, id_preds = torch.max(output.detach(), 1)
@@ -297,7 +285,7 @@ optimizer_ft = optim.SGD([
     {'params': base_params, 'lr': 0.1 * opt.lr},
 ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
-epoch = 60
+epoch = 130
 step = 40
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=step, gamma=0.1)
 print('net_loss_model = %s   epoc = %3d   step = %3d' % (opt.net_loss_model, epoch, step))
