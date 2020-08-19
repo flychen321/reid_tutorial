@@ -141,9 +141,9 @@ def train(model, criterion, optimizer, scheduler, num_epochs=25):
                     num_part = 6
                     score = sm(part[:,:,0]) + sm(part[:,:,1]) + sm(part[:,:,2]) + sm(part[:,:,3]) + sm(part[:,:,4]) + sm(part[:,:,5])
                     _, id_preds = torch.max(score.data, 1)
-                    loss = criterion(part[0], id_labels)
+                    loss = criterion(part[:,:,0], id_labels)
                     for i in range(num_part - 1):
-                        loss += criterion(part[i + 1], id_labels)
+                        loss += criterion(part[:,:,i + 1], id_labels)
 
                     # output = model(inputs)
                     # part = {}
