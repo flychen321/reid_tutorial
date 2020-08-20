@@ -24,15 +24,14 @@ except ImportError:  # will be 3.x series
 
 parser = argparse.ArgumentParser(description='Testing')
 parser.add_argument('--gpu_ids', default='0', type=str, help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--which_epoch', default='best', type=str, help='0,1,2,3...or last')
-parser.add_argument('--test_dir', default='market', type=str, help='./test_data')
-parser.add_argument('--name', default='ide', type=str, help='save model path')
-parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
+parser.add_argument('--which_epoch', default='last', type=str, help='0,1,2,3...or last')
+parser.add_argument('--test_dir', default='duke', type=str, help='./test_data')
+parser.add_argument('--name', default='pcb', type=str, help='save model path')
+parser.add_argument('--batchsize', default=64, type=int, help='batchsize')
 parser.add_argument('--net_loss_model', default=0, type=int, help='net_loss_model')
-parser.add_argument('--PCB', action='store_true', help='use PCB+ResNet50')
+parser.add_argument('--PCB', action='store_false', help='use PCB+ResNet50')
 
 opt = parser.parse_args()
-opt.PCB = True
 print('opt = %s' % opt)
 print('opt.gpu_ids = %s' % opt.gpu_ids)
 print('opt.which_epoch = %s' % opt.which_epoch)
@@ -60,11 +59,19 @@ for str_id in str_ids:
 # We will use torchvision and torch.utils.data packages for loading the
 # data.
 #
-data_transforms = transforms.Compose([
-    transforms.Resize((256, 128), interpolation=3),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+
+if opt.PCB:
+    data_transforms = transforms.Compose([
+        transforms.Resize((384,192), interpolation=3),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+else:
+    data_transforms = transforms.Compose([
+        transforms.Resize((256, 128), interpolation=3),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
 
 dataset_list = ['gallery', 'query']
 image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms) for x in dataset_list}
@@ -151,7 +158,10 @@ for i in range(len(dataset_list)):
 print('-------test-----------')
 class_num = len(os.listdir(os.path.join(data_dir, 'train_all')))
 model = PCB(class_num)
-model = load_whole_network(model, name, opt.which_epoch + '_' + str(opt.net_loss_model))
+if 'st' in opt.which_epoch:
+    model = load_whole_network(model, name, opt.which_epoch + '_' + str(opt.net_loss_model))
+else:
+    model = load_whole_network(model, name, opt.which_epoch)
 model = model.eval()
 if use_gpu:
     model = model.cuda()

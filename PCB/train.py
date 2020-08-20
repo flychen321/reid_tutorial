@@ -24,19 +24,17 @@ version = torch.__version__
 # Options
 # --------
 parser = argparse.ArgumentParser(description='Training')
-parser.add_argument('--name', default='ide', type=str, help='output model name')
+parser.add_argument('--name', default='pcb', type=str, help='output model name')
 parser.add_argument('--save_model_name', default='', type=str, help='save_model_name')
-parser.add_argument('--data_dir', default='market', type=str, help='training dir path')
+parser.add_argument('--data_dir', default='duke', type=str, help='training dir path')
 parser.add_argument('--batchsize', default=48, type=int, help='batchsize')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
 parser.add_argument('--alpha', default=1.0, type=float, help='alpha')
-parser.add_argument('--erasing_p', default=0.5, type=float, help='Random Erasing probability, in [0,1]')
+parser.add_argument('--erasing_p', default=0.0, type=float, help='Random Erasing probability, in [0,1]')
 parser.add_argument('--net_loss_model', default=0, type=int, help='net_loss_model')
-parser.add_argument('--PCB', action='store_true', help='use PCB+ResNet50')
-
+parser.add_argument('--PCB', action='store_false', help='use PCB+ResNet50')
 
 opt = parser.parse_args()
-opt.PCB = True
 print('opt = %s' % opt)
 print('net_loss_model = %d' % opt.net_loss_model)
 print('save_model_name = %s' % opt.save_model_name)
@@ -45,23 +43,35 @@ name = opt.name
 
 ######################################################################
 # Load Data
-# ---------
-#
+# --------------------------------------------------------------------
 
-transform_train_list = [
-    transforms.Resize((256, 128), interpolation=3),
-    transforms.Pad(10),
-    transforms.RandomCrop((256, 128)),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-]
 
-transform_val_list = [
-    transforms.Resize(size=(256, 128), interpolation=3),  # Image.BICUBIC
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-]
+if opt.PCB:
+    transform_train_list = [
+        transforms.Resize((384, 192), interpolation=3),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ]
+    transform_val_list = [
+        transforms.Resize(size=(384, 192), interpolation=3),  # Image.BICUBIC
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ]
+else:
+    transform_train_list = [
+        transforms.Resize((256, 128), interpolation=3),
+        transforms.Pad(10),
+        transforms.RandomCrop((256, 128)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ]
+    transform_val_list = [
+        transforms.Resize(size=(256, 128), interpolation=3),  # Image.BICUBIC
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ]
 
 if opt.erasing_p > 0:
     transform_train_list = transform_train_list + [RandomErasing(probability=opt.erasing_p, mean=[0.0, 0.0, 0.0])]
@@ -285,8 +295,8 @@ optimizer_ft = optim.SGD([
     {'params': base_params, 'lr': 0.1 * opt.lr},
 ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
-epoch = 130
-step = 40
+epoch = 65
+step = 20
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=step, gamma=0.1)
 print('net_loss_model = %s   epoc = %3d   step = %3d' % (opt.net_loss_model, epoch, step))
 model = train(model, criterion, optimizer_ft, exp_lr_scheduler,
