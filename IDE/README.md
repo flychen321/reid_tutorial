@@ -15,12 +15,12 @@ unzip Market-1501-v15.09.15.zip
 ln -s Market-1501-v15.09.15 market
 ``` 
 then, get the directory structure
+``` 
 ├── IDE
 　　　├── data
 　　　　　　├── market
 　　　　　　├── Market-1501-v15.09.15
-
-
+``` 
 Preparation 2: Put the images with the same id in one folder. You may use 
 ```bash
 python prepare.py
